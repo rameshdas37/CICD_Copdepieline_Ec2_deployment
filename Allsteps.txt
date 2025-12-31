@@ -1,0 +1,219 @@
+1️⃣ Architecture (Simple & Practical)
+GitHub / CodeCommit
+        |
+        v
+   CodePipeline
+        |
+        v
+   CodeBuild
+   (Build + Test)
+        |
+        v
+   CodeDeploy
+   (Deploy to EC2)
+
+
+Key Rule
+👉 If tests fail, pipeline stops automatically and deployment never happens.
+
+2️⃣ Example Project (Very Simple)
+
+We will deploy a Python Flask app to EC2.
+
+Project structure (important)
+my-flask-app/
+├── app.py
+├── requirements.txt
+├── buildspec.yml
+├── appspec.yml
+└── scripts/
+    ├── install_dependencies.sh
+    ├── start_server.sh
+    └── stop_server.sh
+
+3️⃣ Step 1 – Create EC2 Instance (Deployment Target)
+EC2 Setup
+
+Launch Amazon Linux 2
+
+Attach IAM Role:
+
+AmazonEC2RoleforAWSCodeDeploy
+
+Install CodeDeploy Agent:
+
+sudo yum update -y
+sudo yum install ruby wget -y
+cd /home/ec2-user
+wget https://aws-codedeploy-ap-south-1.s3.ap-south-1.amazonaws.com/latest/install
+chmod +x install
+sudo ./install auto
+sudo systemctl start codedeploy-agent
+
+
+✔ EC2 is now ready
+
+4️⃣ Step 2 – Create CodeDeploy Application
+
+Go to CodeDeploy → Applications
+
+Create Application:
+
+Name: Flask-App
+
+Compute Platform: EC2/On-Premises
+
+Create Deployment Group:
+
+EC2 tag (example):
+
+Key: Name
+
+Value: Flask-Server
+
+Service role: CodeDeployServiceRole
+
+5️⃣ Step 3 – Source Code (GitHub / CodeCommit)
+
+Push your project to GitHub or CodeCommit.
+
+Example app.py
+
+from flask import Flask
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Deployment Successful 🚀"
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=80)
+
+
+requirements.txt
+
+flask
+
+6️⃣ Step 4 – Build + Test using CodeBuild
+buildspec.yml (VERY IMPORTANT)
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo Installing dependencies
+      - pip install -r requirements.txt
+
+  pre_build:
+    commands:
+      - echo Running tests
+      - python -m py_compile app.py   # simple test
+
+  build:
+    commands:
+      - echo Build completed successfully
+
+artifacts:
+  files:
+    - '**/*'
+
+
+✅ If syntax error exists, build fails
+✅ Pipeline stops automatically
+
+7️⃣ Step 5 – Deployment Scripts
+appspec.yml
+version: 0.0
+os: linux
+
+files:
+  - source: /
+    destination: /home/ec2-user/app
+
+hooks:
+  BeforeInstall:
+    - location: scripts/stop_server.sh
+  AfterInstall:
+    - location: scripts/install_dependencies.sh
+  ApplicationStart:
+    - location: scripts/start_server.sh
+
+scripts/stop_server.sh
+#!/bin/bash
+pkill -f app.py || true
+
+scripts/install_dependencies.sh
+#!/bin/bash
+cd /home/ec2-user/app
+pip3 install -r requirements.txt
+
+scripts/start_server.sh
+#!/bin/bash
+cd /home/ec2-user/app
+nohup python3 app.py > app.log 2>&1 &
+
+
+Make scripts executable:
+
+chmod +x scripts/*.sh
+
+8️⃣ Step 6 – Create CodePipeline (Console – Step by Step)
+Pipeline Setup
+
+CodePipeline → Create pipeline
+
+Pipeline name: Flask-CICD-Pipeline
+
+Service role: Auto-create
+
+Source Stage
+
+Source provider: GitHub / CodeCommit
+
+Repository: my-flask-app
+
+Branch: main
+
+Build Stage
+
+Provider: AWS CodeBuild
+
+Create new project:
+
+Environment: Amazon Linux 2
+
+Runtime: Python 3.9
+
+Buildspec: buildspec.yml
+
+✔ This stage builds + tests
+
+Deploy Stage
+
+Provider: AWS CodeDeploy
+
+Application name: Flask-App
+
+Deployment group: Flask-App-DG
+
+9️⃣ Pipeline Execution Flow (Important)
+Stage	What Happens
+Source	Pulls code
+Build	Installs deps + runs tests
+❌ Test fails	Pipeline stops
+✅ Test passes	Deploys to EC2
+Deploy	CodeDeploy hooks execute
+🔟 Verify Deployment
+
+Get EC2 public IP
+
+Open browser:
+
+http://<EC2-PUBLIC-IP>
+
+
+You should see:
+
+Deployment Successful 🚀
