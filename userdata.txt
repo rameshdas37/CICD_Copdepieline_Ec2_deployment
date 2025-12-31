@@ -1,0 +1,11 @@
+#!/bin/bash
+# Install the CodeDeploy agent and its prerequisites on Amazon Linux/RHEL
+sudo yum update -y
+sudo yum install -y ruby wget
+sudo python3 install pip3
+cd /home/ec2-user
+wget https://aws-codedeploy-us-east-1.s3.amazonaws.com/latest/install
+chmod +x ./install
+sudo ./install auto
+sudo systemctl start codedeploy-agent
+sudo systemctl enable codedeploy-agent # Ensure agent starts automatically on reboot
