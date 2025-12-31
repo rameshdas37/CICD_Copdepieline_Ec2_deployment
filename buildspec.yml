@@ -5,17 +5,16 @@ phases:
     runtime-versions:
       python: 3.9
     commands:
-      - echo Installing dependencies
       - pip install -r requirements.txt
 
   pre_build:
     commands:
-      - echo Running tests
-      - python -m py_compile app.py   # simple test
+      - python --version
+      - python -m py_compile app.py
 
   build:
     commands:
-      - echo Build completed successfully
+      - echo "Build completed"
 
 artifacts:
   files:
